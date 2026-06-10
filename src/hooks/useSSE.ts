@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react'
+import env from '../config/env'
 
 type SSEEventHandler = (data: Record<string, unknown>) => void
 
@@ -10,7 +11,7 @@ export function useSSE(handlers: Record<string, SSEEventHandler>) {
   handlersRef.current = handlers
 
   const connect = useCallback(() => {
-    const url = `${import.meta.env.VITE_API_BASE}/jobs/events`
+    const url = `${env.VITE_API_BASE}/jobs/events`
     const source = new EventSource(url)
     sourceRef.current = source
 
