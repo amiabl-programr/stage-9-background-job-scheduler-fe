@@ -1,11 +1,25 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
 import Dashboard from './pages/Dashboard'
+import JobList from './pages/JobList'
+import CreateJob from './pages/CreateJob'
+
+function Nav() {
+  return (
+    <nav className="border-b bg-white px-6 py-3 flex gap-6 text-sm">
+      <Link to="/" className="font-semibold text-blue-600 hover:underline">Dashboard</Link>
+      <Link to="/jobs" className="font-semibold text-blue-600 hover:underline">Jobs</Link>
+    </nav>
+  )
+}
 
 function App() {
   return (
     <BrowserRouter>
+      <Nav />
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/jobs" element={<JobList />} />
+        <Route path="/jobs/create" element={<CreateJob />} />
       </Routes>
     </BrowserRouter>
   )
