@@ -14,8 +14,10 @@ export function useSSE(handlers: Record<string, SSEEventHandler>) {
   })
 
   useEffect(() => {
+    const url = `${env.VITE_API_BASE}/api/v1/jobs/events`
+
     const connect = () => {
-      const url = `${env.VITE_API_BASE}/jobs/events`
+      sourceRef.current?.close()
       const source = new EventSource(url)
       sourceRef.current = source
 
@@ -39,5 +41,5 @@ export function useSSE(handlers: Record<string, SSEEventHandler>) {
 
     connect()
     return () => sourceRef.current?.close()
-  }, [handlers])
+  }, [])
 }

@@ -76,7 +76,8 @@ export interface SSEEvent {
 
 export interface HealthCheckResponse {
   status: string
-  timestamp: string
+  db: string
+  redis: string
 }
 
 export interface ApiError {
