@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Job, JobStatus, JobPriority, JobQueryParams } from '../types'
 import { listJobs, cancelJob } from '../api/jobs'
@@ -17,26 +17,26 @@ export default function JobList() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [cancelTarget, setCancelTarget] = useState<string | null>(null)
 
-  const fetch = useCallback(async () => {
-    try {
-      const res = await listJobs({ ...filters, page, limit })
-      setJobs(res.data)
-      setTotal(res.total)
-    } catch {
-      setJobs([])
-    }
-  }, [filters, page])
-
   useEffect(() => {
-    fetch()
-  }, [fetch])
+    listJobs({ ...filters, page, limit })
+      .then((res) => {
+        setJobs(res.data)
+        setTotal(res.total)
+      })
+      .catch(() => setJobs([]))
+  }, [filters, page])
 
   const handleCancel = async () => {
     if (!cancelTarget) return
     try {
       await cancelJob(cancelTarget)
       setCancelTarget(null)
-      fetch()
+      listJobs({ ...filters, page, limit })
+        .then((res) => {
+          setJobs(res.data)
+          setTotal(res.total)
+        })
+        .catch(() => setJobs([]))
     } catch {
       // error handled by interceptor
     }
