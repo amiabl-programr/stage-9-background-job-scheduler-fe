@@ -22,11 +22,26 @@ jobs:
     name: Deploy
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-22.04
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: SSH deploy
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p ${{ secrets.SERVER_PORT }} ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Test SSH connectivity
+        run: |
+          ssh -v -p ${{ secrets.SERVER_PORT }} \
+            -o StrictHostKeyChecking=accept-new \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} \
+            echo "SSH connection successful"
+
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SERVER_IP }}
@@ -36,12 +51,21 @@ jobs:
           script_stop: true
           script: |
             set -e
+            mkdir -p /var/www/scheduler-ui
             cd /var/www/scheduler-ui
-            git pull origin main
+
+            # Initialize repository if it doesn't exist
+            if [ ! -d .git ]; then
+              git clone https://github.com/amiabl-programr/stage-9-background-job-scheduler-fe.git .
+            fi
+
+            # Pull latest changes
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Install and build
             pnpm install --frozen-lockfile
             pnpm build
-            rm -rf /var/www/scheduler-ui/dist/*
-            cp -r dist/* /var/www/scheduler-ui/dist/
 
       - name: Smoke check
         run: |
