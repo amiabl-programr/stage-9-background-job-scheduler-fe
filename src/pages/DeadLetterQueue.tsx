@@ -7,24 +7,17 @@ export default function DeadLetterQueue() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [retrying, setRetrying] = useState<string | null>(null)
 
-  const fetch = async () => {
-    try {
-      const data = await listDeadLetter()
-      setEntries(data)
-    } catch {
-      setEntries([])
-    }
-  }
-
   useEffect(() => {
-    fetch()
+    listDeadLetter()
+      .then((data) => setEntries(data))
+      .catch(() => setEntries([]))
   }, [])
 
   const handleRetry = async (id: string) => {
     setRetrying(id)
     try {
       await retryDeadLetter(id)
-      fetch()
+      listDeadLetter().then((data) => setEntries(data)).catch(() => setEntries([]))
     } catch {
       // handled by interceptor
     } finally {
