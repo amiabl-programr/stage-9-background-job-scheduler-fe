@@ -1,5 +1,14 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import Dashboard from './pages/Dashboard'
+
 function App() {
-  return <h1 className="text-2xl font-bold p-4">Job Scheduler Dashboard</h1>
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+      </Routes>
+    </BrowserRouter>
+  )
 }
 
 export default App
