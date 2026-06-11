@@ -1,10 +1,3 @@
-# Required GitHub secrets:
-#   SERVER_IP       — VPS public IP address
-#   SERVER_USER     — SSH username on the server (e.g. deploy)
-#   SSH_PRIVATE_KEY — Private SSH key (public key must be in ~/.ssh/authorized_keys on server)
-#   SERVER_PORT     — SSH port (usually 22)
-#   APP_DOMAIN      — e.g. stage9.duckdns.org
-
 name: CD
 
 on:
@@ -51,10 +44,11 @@ jobs:
           script_stop: true
           script: |
             set -e
+
             mkdir -p /var/www/scheduler-ui
             cd /var/www/scheduler-ui
 
-            # Initialize repository if it doesn't exist
+            # Clone repo if not exists
             if [ ! -d .git ]; then
               git clone https://github.com/amiabl-programr/stage-9-background-job-scheduler-fe.git .
             fi
@@ -63,9 +57,18 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
-            # Install and build
+            # Create frontend env file (IMPORTANT: used during build)
+            cat > .env <<EOF
+            VITE_API_BASE=${VITE_API_BASE}
+            EOF
+
+            # Install dependencies and build
             pnpm install --frozen-lockfile
             pnpm build
+
+            # Optional verification
+            echo "Frontend build environment:"
+            cat .env
 
       - name: Smoke check
         run: |
