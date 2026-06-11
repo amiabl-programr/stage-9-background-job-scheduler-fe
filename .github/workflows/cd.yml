@@ -45,30 +45,31 @@ jobs:
           script: |
             set -e
 
-            mkdir -p /var/www/scheduler-ui
-            cd /var/www/scheduler-ui
+            APP_DIR="/var/www/scheduler-ui"
 
-            # Clone repo if not exists
+            mkdir -p $APP_DIR
+            cd $APP_DIR
+
+            # Clone if first time
             if [ ! -d .git ]; then
               git clone https://github.com/amiabl-programr/stage-9-background-job-scheduler-fe.git .
             fi
 
-            # Pull latest changes
+            # Update code
             git fetch origin main
             git reset --hard origin/main
 
-            # Create frontend env file (IMPORTANT: used during build)
-            cat > .env <<EOF
-            VITE_API_BASE=${VITE_API_BASE}
-            EOF
+            # Inject env
+            echo "VITE_API_BASE=${{ secrets.VITE_API_BASE }}" > .env
 
-            # Install dependencies and build
+            echo "=== ENV CHECK ==="
+            cat .env
+
+            # Install + build
             pnpm install --frozen-lockfile
             pnpm build
 
-            # Optional verification
-            echo "Frontend build environment:"
-            cat .env
+            echo "=== BUILD DONE ==="
 
       - name: Smoke check
         run: |
