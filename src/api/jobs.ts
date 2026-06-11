@@ -1,31 +1,33 @@
 import client from './client'
 import type { Job, PaginatedResponse, JobQueryParams, CreateJobPayload, UpdateJobPayload } from '../types'
 
+const PREFIX = '/api/v1'
+
 export async function listJobs(params?: JobQueryParams): Promise<PaginatedResponse<Job>> {
-  const { data } = await client.get('/jobs', { params })
-  return data
+  const res = await client.get(`${PREFIX}/jobs`, { params })
+  return res.data.data
 }
 
 export async function getJob(id: string): Promise<Job> {
-  const { data } = await client.get(`/jobs/${id}`)
-  return data
+  const res = await client.get(`${PREFIX}/jobs/${id}`)
+  return res.data.data
 }
 
 export async function createJob(payload: CreateJobPayload): Promise<Job> {
-  const { data } = await client.post('/jobs', payload)
-  return data
+  const res = await client.post(`${PREFIX}/jobs`, payload)
+  return res.data.data
 }
 
 export async function updateJob(id: string, payload: UpdateJobPayload): Promise<Job> {
-  const { data } = await client.patch(`/jobs/${id}`, payload)
-  return data
+  const res = await client.patch(`${PREFIX}/jobs/${id}`, payload)
+  return res.data.data
 }
 
 export async function cancelJob(id: string): Promise<Job> {
-  const { data } = await client.patch(`/jobs/${id}/cancel`)
-  return data
+  const res = await client.patch(`${PREFIX}/jobs/${id}/cancel`)
+  return res.data.data
 }
 
 export async function deleteJob(id: string): Promise<void> {
-  await client.delete(`/jobs/${id}`)
+  await client.delete(`${PREFIX}/jobs/${id}`)
 }

@@ -52,7 +52,7 @@ export default function CreateJob() {
         type: form.type,
         payload,
         priority: form.priority,
-        scheduledAt: form.scheduledAt || undefined,
+        scheduledAt: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : undefined,
         recurringInterval: (form.recurringInterval || undefined) as RecurringInterval | undefined,
         dependsOn: form.dependsOn
           ? form.dependsOn.split(',').map((s) => s.trim()).filter(Boolean)
@@ -60,11 +60,12 @@ export default function CreateJob() {
       })
       navigate('/jobs')
     } catch (err: unknown) {
-      const apiErr = err as { message?: unknown }
-      if (Array.isArray(apiErr.message)) {
-        setErrors(apiErr.message as FieldError[])
+      const apiErr = err as { error?: { message?: unknown } }
+      const msg = apiErr?.error?.message
+      if (Array.isArray(msg)) {
+        setErrors(msg as FieldError[])
       } else {
-        setErrors([{ property: 'general', constraints: { general: String(apiErr.message || 'Unknown error') } }])
+        setErrors([{ property: 'general', constraints: { general: String(msg || 'Unknown error') } }])
       }
     } finally {
       setSubmitting(false)
