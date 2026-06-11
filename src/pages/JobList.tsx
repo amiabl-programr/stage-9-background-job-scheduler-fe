@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, Fragment } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Job, JobStatus, JobPriority, JobQueryParams } from '../types'
 import { listJobs, cancelJob } from '../api/jobs'
@@ -11,18 +11,20 @@ const CANCELLABLE_STATUSES: JobStatus[] = ['pending', 'processing']
 
 export default function JobList() {
   const navigate = useNavigate()
+
   const [jobs, setJobs] = useState<Job[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [filters, setFilters] = useState<JobQueryParams>({})
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null)
+
   const [isLoading, setIsLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
 
   const LIMIT = 20
 
-  // ✅ loadJobs removed from useCallback + useEffect combo
+  // ✅ FIXED: safe effect without unsafe finally/return patterns
   useEffect(() => {
     let isMounted = true
 
@@ -43,10 +45,12 @@ export default function JobList() {
         setTotal(res.total)
       } catch {
         if (!isMounted) return
+
         setFetchError('Failed to load jobs. Please try again.')
         setJobs([])
-      } finally {
-        if (!isMounted) return
+      }
+
+      if (isMounted) {
         setIsLoading(false)
       }
     }
@@ -60,28 +64,33 @@ export default function JobList() {
 
   const handleCancelConfirm = async () => {
     if (!cancelTargetId) return
+
     try {
       await cancelJob(cancelTargetId)
       setCancelTargetId(null)
 
-      // reload after cancel
-      setIsLoading(true)
+      // reload list after cancel
       const res = await listJobs({ ...filters, page, limit: LIMIT })
       setJobs(res.data)
       setTotal(res.total)
-      setIsLoading(false)
     } catch {
-      // handled globally
+      // handled globally via interceptor
     }
   }
 
   const handleFilterStatus = (value: string) => {
-    setFilters((prev) => ({ ...prev, status: (value || undefined) as JobStatus | undefined }))
+    setFilters((prev) => ({
+      ...prev,
+      status: (value || undefined) as JobStatus | undefined,
+    }))
     setPage(1)
   }
 
   const handleFilterType = (value: string) => {
-    setFilters((prev) => ({ ...prev, type: value || undefined }))
+    setFilters((prev) => ({
+      ...prev,
+      type: value || undefined,
+    }))
     setPage(1)
   }
 
@@ -101,6 +110,7 @@ export default function JobList() {
     <div className="p-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">Jobs</h1>
+
         <button
           onClick={() => navigate('/jobs/create')}
           className="px-4 py-1.5 rounded bg-blue-600 text-white text-sm hover:bg-blue-700 transition-colors"
@@ -143,7 +153,7 @@ export default function JobList() {
         </select>
       </div>
 
-      {/* Error state */}
+      {/* Error */}
       {fetchError && (
         <div className="mb-4 p-3 rounded bg-red-50 border border-red-200 text-sm text-red-700">
           {fetchError}
@@ -168,7 +178,7 @@ export default function JobList() {
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={7} className="p-4 text-center text-gray-400 text-sm">
+                <td colSpan={7} className="p-4 text-center text-gray-400">
                   Loading...
                 </td>
               </tr>
@@ -185,18 +195,26 @@ export default function JobList() {
                     className="border-t cursor-pointer hover:bg-gray-50"
                     onClick={() => toggleExpanded(job.id)}
                   >
-                    <td className="p-2 font-mono text-xs">{job.id.slice(0, 8)}…</td>
+                    <td className="p-2 font-mono text-xs">
+                      {job.id.slice(0, 8)}…
+                    </td>
+
                     <td className="p-2">{job.type}</td>
+
                     <td className="p-2">
                       <PriorityBadge priority={job.priority} />
                     </td>
+
                     <td className="p-2">
                       <StatusBadge status={job.status} />
                     </td>
+
                     <td className="p-2">{job.retryCount}</td>
+
                     <td className="p-2 text-xs">
                       {new Date(job.createdAt).toLocaleString()}
                     </td>
+
                     <td className="p-2">
                       {CANCELLABLE_STATUSES.includes(job.status) && (
                         <button
@@ -224,26 +242,34 @@ export default function JobList() {
                           <div><strong>Last Error:</strong> {job.lastError ?? '—'}</div>
                           <div>
                             <strong>Scheduled At:</strong>{' '}
-                            {job.scheduledAt ? new Date(job.scheduledAt).toLocaleString() : '—'}
+                            {job.scheduledAt
+                              ? new Date(job.scheduledAt).toLocaleString()
+                              : '—'}
                           </div>
                           <div>
                             <strong>Recurring:</strong> {job.recurringInterval ?? '—'}
                           </div>
                           <div>
                             <strong>Started At:</strong>{' '}
-                            {job.startedAt ? new Date(job.startedAt).toLocaleString() : '—'}
+                            {job.startedAt
+                              ? new Date(job.startedAt).toLocaleString()
+                              : '—'}
                           </div>
                           <div>
                             <strong>Completed At:</strong>{' '}
-                            {job.completedAt ? new Date(job.completedAt).toLocaleString() : '—'}
+                            {job.completedAt
+                              ? new Date(job.completedAt).toLocaleString()
+                              : '—'}
                           </div>
                           <div className="col-span-2">
                             <strong>Depends On:</strong>{' '}
                             {job.dependsOn.length ? job.dependsOn.join(', ') : '—'}
                           </div>
+
                           <div className="col-span-2">
                             <strong>Payload:</strong>
                           </div>
+
                           <pre className="col-span-2 bg-gray-100 p-2 rounded overflow-auto max-h-40">
                             {JSON.stringify(job.payload, null, 2)}
                           </pre>
@@ -258,7 +284,12 @@ export default function JobList() {
         </table>
       </div>
 
-      <Pagination page={page} limit={LIMIT} total={total} onPageChange={setPage} />
+      <Pagination
+        page={page}
+        limit={LIMIT}
+        total={total}
+        onPageChange={setPage}
+      />
 
       <ConfirmModal
         open={!!cancelTargetId}
