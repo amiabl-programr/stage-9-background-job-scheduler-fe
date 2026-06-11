@@ -26,6 +26,7 @@ async function fetchAllStatusCounts(): Promise<StatusCounts> {
   const results = await Promise.all(
     statuses.map((status) => listJobs({ status, page: 1, limit: 1 }))
   )
+
   return {
     pending: results[0].total,
     processing: results[1].total,
@@ -37,12 +38,13 @@ async function fetchAllStatusCounts(): Promise<StatusCounts> {
 
 export default function Dashboard() {
   const [counts, setCounts] = useState<StatusCounts>(INITIAL_COUNTS)
-  const [isApiHealthy, setIsApiHealthy] = useState(false)
+
+  // Start as loading = true (no need to set it inside an effect)
   const [isLoadingCounts, setIsLoadingCounts] = useState(true)
+  const [isApiHealthy, setIsApiHealthy] = useState(false)
 
   // Fetch real counts on mount
   useEffect(() => {
-    setIsLoadingCounts(true)
     fetchAllStatusCounts()
       .then(setCounts)
       .catch(() => setCounts(INITIAL_COUNTS))
@@ -64,25 +66,23 @@ export default function Dashboard() {
   }, [])
 
   useSSE({
-    // job.created → pending+1
     'job.created': () => increment('pending'),
-    // job.started → pending-1, processing+1
+
     'job.started': () => {
       decrement('pending')
       increment('processing')
     },
-    // job.completed → processing-1, completed+1
+
     'job.completed': () => {
       decrement('processing')
       increment('completed')
     },
-    // job.failed → processing-1, failed+1
+
     'job.failed': () => {
       decrement('processing')
       increment('failed')
     },
-    // job.cancelled → pending/processing-1, cancelled+1
-    // We don't know which state it was in, so just increment cancelled
+
     'job.cancelled': () => increment('cancelled'),
   })
 
@@ -98,6 +98,7 @@ export default function Dashboard() {
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Dashboard</h1>
+
         <div className="flex items-center gap-2">
           <span
             className={`inline-block w-3 h-3 rounded-full ${
@@ -114,13 +115,21 @@ export default function Dashboard() {
       {isLoadingCounts ? (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="rounded-lg border p-4 text-center bg-gray-50 animate-pulse h-20" />
+            <div
+              key={i}
+              className="rounded-lg border p-4 text-center bg-gray-50 animate-pulse h-20"
+            />
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {cards.map((card) => (
-            <CountCard key={card.label} label={card.label} count={card.count} color={card.color} />
+            <CountCard
+              key={card.label}
+              label={card.label}
+              count={card.count}
+              color={card.color}
+            />
           ))}
         </div>
       )}
