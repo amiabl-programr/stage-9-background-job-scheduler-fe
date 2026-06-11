@@ -1,13 +1,13 @@
 import client from './client'
-import type { DeadLetterEntry } from '../types'
-
-const PREFIX = '/api/v1'
+import type { DeadLetterEntry, Job } from '../types'
 
 export async function listDeadLetter(): Promise<DeadLetterEntry[]> {
-  const res = await client.get(`${PREFIX}/dead-letter`)
+  const res = await client.get('/api/v1/dead-letter')
   return res.data.data
 }
 
-export async function retryDeadLetter(id: string): Promise<void> {
-  await client.post(`${PREFIX}/dead-letter/${id}/retry`)
+// BE returns the newly created Job (201), not void
+export async function retryDeadLetter(id: string): Promise<Job> {
+  const res = await client.post(`/api/v1/dead-letter/${id}/retry`)
+  return res.data.data
 }
