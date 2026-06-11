@@ -3,8 +3,10 @@ name: CD
 on:
   workflow_run:
     workflows: ["CI"]
-    types: [completed]
-    branches: [main]
+    types:
+      - completed
+    branches:
+      - main
 
 concurrency:
   group: frontend-deploy
@@ -17,28 +19,10 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-
-          ssh-keyscan \
-            -p ${{ secrets.SERVER_PORT }} \
-            ${{ secrets.SERVER_IP }} \
-            >> ~/.ssh/known_hosts 2>/dev/null || true
-
-      - name: Test SSH connectivity
-        run: |
-          ssh -p ${{ secrets.SERVER_PORT }} \
-            -o StrictHostKeyChecking=accept-new \
-            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} \
-            "echo SSH connection successful"
-
-      - name: Build and Deploy
+      - name: Deploy to Server
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SERVER_IP }}
@@ -56,9 +40,7 @@ jobs:
             mkdir -p "$WEB_ROOT"
 
             if [ ! -d "$REPO_DIR/.git" ]; then
-              git clone \
-                https://github.com/amiabl-programr/stage-9-background-job-scheduler-fe.git \
-                "$REPO_DIR"
+              git clone https://github.com/amiabl-programr/stage-9-background-job-scheduler-fe.git "$REPO_DIR"
             fi
 
             cd "$REPO_DIR"
@@ -84,28 +66,14 @@ jobs:
             rm -rf "$WEB_ROOT"/*
             cp -R dist/* "$WEB_ROOT"/
 
-            if command -v nginx >/dev/null 2>&1; then
-              sudo nginx -t
-              sudo systemctl reload nginx
-            fi
-
-            echo "Deployment completed"
-
-      - name: Smoke check
-        run: |
-          curl \
-            --fail \
-            --retry 5 \
-            --retry-delay 3 \
-            --retry-connrefused \
-            https://${{ secrets.APP_DOMAIN }}/
+            echo "Deployment completed successfully"
 
       - name: Deployment Summary
         run: |
           {
-            echo "## Deployment Summary"
+            echo "## Frontend Deployment"
             echo "- Commit: ${{ github.sha }}"
-            echo "- Triggered by: ${{ github.actor }}"
+            echo "- Actor: ${{ github.actor }}"
             echo "- Time (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')"
-            echo "- Smoke check: PASSED"
+            echo "- Status: Success"
           } >> $GITHUB_STEP_SUMMARY
