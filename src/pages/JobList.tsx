@@ -22,33 +22,56 @@ export default function JobList() {
 
   const LIMIT = 20
 
-  const loadJobs = useCallback(() => {
-    setIsLoading(true)
-    setFetchError(null)
-    listJobs({ ...filters, page, limit: LIMIT })
-      .then((res) => {
+  // ✅ loadJobs removed from useCallback + useEffect combo
+  useEffect(() => {
+    let isMounted = true
+
+    const loadJobs = async () => {
+      setIsLoading(true)
+      setFetchError(null)
+
+      try {
+        const res = await listJobs({
+          ...filters,
+          page,
+          limit: LIMIT,
+        })
+
+        if (!isMounted) return
+
         setJobs(res.data)
         setTotal(res.total)
-      })
-      .catch(() => {
+      } catch {
+        if (!isMounted) return
         setFetchError('Failed to load jobs. Please try again.')
         setJobs([])
-      })
-      .finally(() => setIsLoading(false))
-  }, [filters, page])
+      } finally {
+        if (!isMounted) return
+        setIsLoading(false)
+      }
+    }
 
-  useEffect(() => {
     loadJobs()
-  }, [loadJobs])
+
+    return () => {
+      isMounted = false
+    }
+  }, [filters, page])
 
   const handleCancelConfirm = async () => {
     if (!cancelTargetId) return
     try {
       await cancelJob(cancelTargetId)
       setCancelTargetId(null)
-      loadJobs()
+
+      // reload after cancel
+      setIsLoading(true)
+      const res = await listJobs({ ...filters, page, limit: LIMIT })
+      setJobs(res.data)
+      setTotal(res.total)
+      setIsLoading(false)
     } catch {
-      // errors surfaced by axios interceptor
+      // handled globally
     }
   }
 
@@ -141,6 +164,7 @@ export default function JobList() {
               <th className="p-2 font-medium">Actions</th>
             </tr>
           </thead>
+
           <tbody>
             {isLoading ? (
               <tr>
@@ -156,15 +180,12 @@ export default function JobList() {
               </tr>
             ) : (
               jobs.map((job) => (
-                // Fragment must have a key when used in a list
                 <Fragment key={job.id}>
                   <tr
                     className="border-t cursor-pointer hover:bg-gray-50"
                     onClick={() => toggleExpanded(job.id)}
                   >
-                    <td className="p-2 font-mono text-xs" title={job.id}>
-                      {job.id.slice(0, 8)}…
-                    </td>
+                    <td className="p-2 font-mono text-xs">{job.id.slice(0, 8)}…</td>
                     <td className="p-2">{job.type}</td>
                     <td className="p-2">
                       <PriorityBadge priority={job.priority} />
@@ -177,7 +198,6 @@ export default function JobList() {
                       {new Date(job.createdAt).toLocaleString()}
                     </td>
                     <td className="p-2">
-                      {/* BE allows cancel on both pending and processing */}
                       {CANCELLABLE_STATUSES.includes(job.status) && (
                         <button
                           onClick={(e) => {
@@ -201,14 +221,10 @@ export default function JobList() {
                           <div><strong>Priority:</strong> {job.priority}</div>
                           <div><strong>Effective Priority:</strong> {job.effectivePriority}</div>
                           <div><strong>Retries:</strong> {job.retryCount}</div>
-                          <div>
-                            <strong>Last Error:</strong> {job.lastError ?? '—'}
-                          </div>
+                          <div><strong>Last Error:</strong> {job.lastError ?? '—'}</div>
                           <div>
                             <strong>Scheduled At:</strong>{' '}
-                            {job.scheduledAt
-                              ? new Date(job.scheduledAt).toLocaleString()
-                              : '—'}
+                            {job.scheduledAt ? new Date(job.scheduledAt).toLocaleString() : '—'}
                           </div>
                           <div>
                             <strong>Recurring:</strong> {job.recurringInterval ?? '—'}
@@ -219,9 +235,7 @@ export default function JobList() {
                           </div>
                           <div>
                             <strong>Completed At:</strong>{' '}
-                            {job.completedAt
-                              ? new Date(job.completedAt).toLocaleString()
-                              : '—'}
+                            {job.completedAt ? new Date(job.completedAt).toLocaleString() : '—'}
                           </div>
                           <div className="col-span-2">
                             <strong>Depends On:</strong>{' '}
