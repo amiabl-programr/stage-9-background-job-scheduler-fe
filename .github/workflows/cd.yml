@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy
+    name: Deploy Frontend
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-22.04
 
@@ -25,16 +25,20 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -p ${{ secrets.SERVER_PORT }} ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          ssh-keyscan \
+            -p ${{ secrets.SERVER_PORT }} \
+            ${{ secrets.SERVER_IP }} \
+            >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Test SSH connectivity
         run: |
-          ssh -v -p ${{ secrets.SERVER_PORT }} \
+          ssh -p ${{ secrets.SERVER_PORT }} \
             -o StrictHostKeyChecking=accept-new \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} \
-            echo "SSH connection successful"
+            "echo SSH connection successful"
 
-      - name: Deploy via SSH
+      - name: Build and Deploy
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SERVER_IP }}
@@ -43,43 +47,65 @@ jobs:
           port: ${{ secrets.SERVER_PORT }}
           script_stop: true
           script: |
-            set -e
+            set -euxo pipefail
 
-            APP_DIR="/var/www/scheduler-ui"
+            REPO_DIR="/var/www/scheduler-ui"
+            WEB_ROOT="/var/www/html"
 
-            mkdir -p $APP_DIR
-            cd $APP_DIR
+            mkdir -p "$REPO_DIR"
+            mkdir -p "$WEB_ROOT"
 
-            # Clone if first time
-            if [ ! -d .git ]; then
-              git clone https://github.com/amiabl-programr/stage-9-background-job-scheduler-fe.git .
+            if [ ! -d "$REPO_DIR/.git" ]; then
+              git clone \
+                https://github.com/amiabl-programr/stage-9-background-job-scheduler-fe.git \
+                "$REPO_DIR"
             fi
 
-            # Update code
+            cd "$REPO_DIR"
+
             git fetch origin main
             git reset --hard origin/main
 
-            # Inject env
-            echo "VITE_API_BASE=${{ secrets.VITE_API_BASE }}" > .env
+            cat > .env << EOF
+            VITE_API_BASE=${{ secrets.VITE_API_BASE }}
+            EOF
 
-            echo "=== ENV CHECK ==="
-            cat .env
+            corepack enable || true
 
-            # Install + build
+            if ! command -v pnpm >/dev/null 2>&1; then
+              npm install -g pnpm
+            fi
+
             pnpm install --frozen-lockfile
             pnpm build
 
-            echo "=== BUILD DONE ==="
+            test -f dist/index.html
+
+            rm -rf "$WEB_ROOT"/*
+            cp -R dist/* "$WEB_ROOT"/
+
+            if command -v nginx >/dev/null 2>&1; then
+              sudo nginx -t
+              sudo systemctl reload nginx
+            fi
+
+            echo "Deployment completed"
 
       - name: Smoke check
         run: |
-          curl --fail --retry 5 --retry-delay 3 --retry-connrefused \
+          curl \
+            --fail \
+            --retry 5 \
+            --retry-delay 3 \
+            --retry-connrefused \
             https://${{ secrets.APP_DOMAIN }}/
 
-      - name: Write deployment summary
+      - name: Deployment Summary
         run: |
-          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Time (UTC):** $(date -u '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
-          echo "- **Smoke check:** ✅ passed" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Deployment Summary"
+            echo "- Commit: ${{ github.sha }}"
+            echo "- Triggered by: ${{ github.actor }}"
+            echo "- Time (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')"
+            echo "- Smoke check: PASSED"
+          } >> $GITHUB_STEP_SUMMARY
