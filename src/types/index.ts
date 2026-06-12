@@ -1,8 +1,20 @@
-export type JobStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'
+export type JobStatus =
+  | 'pending'
+  | 'processing'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
 
 export type JobPriority = 1 | 2 | 3
 
-export type RecurringInterval = 'every_1_minute' | 'every_5_minutes' | 'every_1_hour'
+export type RecurringInterval =
+  | 'every_1_minute'
+  | 'every_5_minutes'
+  | 'every_1_hour'
+
+/* =========================
+   JOBS
+========================= */
 
 export interface CreateJobPayload {
   type: string
@@ -17,16 +29,22 @@ export interface Job {
   id: string
   type: string
   payload: Record<string, unknown>
+
   priority: JobPriority
   status: JobStatus
+
   retryCount: number
   lastError: string | null
+
   scheduledAt: string | null
   recurringInterval: RecurringInterval | null
+
   startedAt: string | null
   completedAt: string | null
+
   effectivePriority: number
   dependsOn: string[]
+
   createdAt: string
   updatedAt: string
 }
@@ -51,6 +69,10 @@ export interface UpdateJobPayload {
   priority?: JobPriority
 }
 
+/* =========================
+   DEAD LETTER QUEUE
+========================= */
+
 export interface DeadLetterEntry {
   id: string
   jobId: string
@@ -59,6 +81,10 @@ export interface DeadLetterEntry {
   jobSnapshot: Job
   createdAt: string
 }
+
+/* =========================
+   SSE EVENTS
+========================= */
 
 export interface SSEEvent {
   jobId?: string
@@ -74,14 +100,37 @@ export interface SSEEvent {
   lastJobId?: string
 }
 
-export interface HealthCheckResponse {
+/* =========================
+   HEALTH CHECK (FIXED)
+========================= */
+
+export interface HealthData {
   status: string
   db: string
   redis: string
 }
 
+export interface HealthMeta {
+  timestamp: string
+  path: string
+}
+
+export interface HealthCheckResponse {
+  data: HealthData
+  meta: HealthMeta
+}
+
+/* =========================
+   API ERROR
+========================= */
+
 export interface ApiError {
   statusCode: number
-  message: string | { property: string; constraints: Record<string, string> }[]
+  message:
+    | string
+    | {
+        property: string
+        constraints: Record<string, string>
+      }[]
   error: string
 }
