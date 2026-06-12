@@ -22,9 +22,18 @@ const INITIAL_COUNTS: StatusCounts = {
 }
 
 async function fetchAllStatusCounts(): Promise<StatusCounts> {
-  const statuses: JobStatus[] = ['pending', 'processing', 'completed', 'failed', 'cancelled']
+  const statuses: JobStatus[] = [
+    'pending',
+    'processing',
+    'completed',
+    'failed',
+    'cancelled',
+  ]
+
   const results = await Promise.all(
-    statuses.map((status) => listJobs({ status, page: 1, limit: 1 }))
+    statuses.map((status) =>
+      listJobs({ status, page: 1, limit: 1 })
+    )
   )
 
   return {
@@ -38,12 +47,9 @@ async function fetchAllStatusCounts(): Promise<StatusCounts> {
 
 export default function Dashboard() {
   const [counts, setCounts] = useState<StatusCounts>(INITIAL_COUNTS)
-
-  // Start as loading = true (no need to set it inside an effect)
   const [isLoadingCounts, setIsLoadingCounts] = useState(true)
   const [isApiHealthy, setIsApiHealthy] = useState(false)
 
-  // Fetch real counts on mount
   useEffect(() => {
     fetchAllStatusCounts()
       .then(setCounts)
@@ -53,7 +59,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     getHealth()
-      .then((res) => setIsApiHealthy(res.status === 'ok'))
+      .then((res) => {
+        setIsApiHealthy(res?.data?.status === 'ok')
+      })
       .catch(() => setIsApiHealthy(false))
   }, [])
 
@@ -62,7 +70,10 @@ export default function Dashboard() {
   }, [])
 
   const decrement = useCallback((status: JobStatus) => {
-    setCounts((prev) => ({ ...prev, [status]: Math.max(0, prev[status] - 1) }))
+    setCounts((prev) => ({
+      ...prev,
+      [status]: Math.max(0, prev[status] - 1),
+    }))
   }, [])
 
   useSSE({
@@ -86,7 +97,7 @@ export default function Dashboard() {
     'job.cancelled': () => increment('cancelled'),
   })
 
-  const cards: { label: string; count: number; color: string }[] = [
+  const cards = [
     { label: 'Pending', count: counts.pending, color: 'gray' },
     { label: 'Processing', count: counts.processing, color: 'blue' },
     { label: 'Completed', count: counts.completed, color: 'green' },
@@ -104,7 +115,6 @@ export default function Dashboard() {
             className={`inline-block w-3 h-3 rounded-full ${
               isApiHealthy ? 'bg-green-500' : 'bg-red-500'
             }`}
-            title={isApiHealthy ? 'API connected' : 'API disconnected'}
           />
           <span className="text-xs text-gray-500">
             {isApiHealthy ? 'Connected' : 'Disconnected'}
