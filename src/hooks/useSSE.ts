@@ -1,14 +1,13 @@
 import { useEffect, useRef } from 'react'
 import env from '../config/env'
 
-type SSEEventHandler = (data: Record<string, unknown>) => void
+type Handler = (data: any) => void
 
-const RECONNECT_DELAY_MS = 3000
 const MAX_RETRIES = 5
 
-export function useSSE(handlers: Record<string, SSEEventHandler>) {
-  const sourceRef = useRef<EventSource | null>(null)
+export function useSSE(handlers: Record<string, Handler>) {
   const handlersRef = useRef(handlers)
+  const sourceRef = useRef<EventSource | null>(null)
 
   useEffect(() => {
     handlersRef.current = handlers
@@ -18,40 +17,66 @@ export function useSSE(handlers: Record<string, SSEEventHandler>) {
     const base = env?.VITE_API_BASE
     if (!base) return
 
-    const sseUrl = `${base}/api/v1/jobs/events`
+    const url = `${base}/api/v1/jobs/events`
 
-    let retryCount = 0
+    let retry = 0
+    let stopped = false
 
     const connect = () => {
-      sourceRef.current?.close()
+      if (stopped) return
 
-      const source = new EventSource(sseUrl)
-      sourceRef.current = source
+      try {
+        sourceRef.current?.close()
 
-      source.onopen = () => console.log('[SSE] connected')
+        const source = new EventSource(url)
+        sourceRef.current = source
 
-      source.onerror = () => {
-        source.close()
+        source.onopen = () => {
+          retry = 0
+          console.log('[SSE] connected')
+        }
 
-        if (retryCount >= MAX_RETRIES) return
+        source.onerror = () => {
+          source.close()
 
-        retryCount++
-        setTimeout(connect, RECONNECT_DELAY_MS)
-      }
-
-      Object.keys(handlersRef.current).forEach((eventName) => {
-        source.addEventListener(eventName, (e: MessageEvent) => {
-          try {
-            handlersRef.current[eventName]?.(JSON.parse(e.data))
-          } catch {
-            // ignore malformed events
+          if (retry >= MAX_RETRIES) {
+            console.warn('[SSE] max retries reached, stopping SSE')
+            return
           }
+
+          retry++
+
+          setTimeout(() => {
+            connect()
+          }, Math.min(3000 * retry, 15000)) // exponential backoff
+        }
+
+        Object.keys(handlersRef.current).forEach((event) => {
+          source.addEventListener(event, (e: MessageEvent) => {
+            try {
+              if (!e?.data) return
+
+              const data =
+                typeof e.data === 'string'
+                  ? JSON.parse(e.data)
+                  : e.data
+
+              handlersRef.current[event]?.(data)
+            } catch (err) {
+              console.warn('[SSE parse error]', err)
+            }
+          })
         })
-      })
+      } catch (err) {
+        console.error('[SSE fatal error]', err)
+      }
     }
 
     connect()
 
-    return () => sourceRef.current?.close()
+    return () => {
+      stopped = true
+      sourceRef.current?.close()
+    }
   }, [])
 }
