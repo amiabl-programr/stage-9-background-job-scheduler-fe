@@ -4,21 +4,27 @@ import env from '../config/env'
 type SSEEventHandler = (data: Record<string, unknown>) => void
 
 const RECONNECT_DELAY_MS = 3000
+const MAX_RETRIES = 5
 
 export function useSSE(handlers: Record<string, SSEEventHandler>) {
   const sourceRef = useRef<EventSource | null>(null)
   const handlersRef = useRef(handlers)
 
-  // Keep handlersRef current without re-subscribing the SSE connection
   useEffect(() => {
     handlersRef.current = handlers
   })
 
   useEffect(() => {
-    const sseUrl = `${env.VITE_API_BASE}/api/v1/jobs/events`
+    const base = env?.VITE_API_BASE
+    if (!base) return
+
+    const sseUrl = `${base}/api/v1/jobs/events`
+
+    let retryCount = 0
 
     const connect = () => {
       sourceRef.current?.close()
+
       const source = new EventSource(sseUrl)
       sourceRef.current = source
 
@@ -26,21 +32,26 @@ export function useSSE(handlers: Record<string, SSEEventHandler>) {
 
       source.onerror = () => {
         source.close()
+
+        if (retryCount >= MAX_RETRIES) return
+
+        retryCount++
         setTimeout(connect, RECONNECT_DELAY_MS)
       }
 
       Object.keys(handlersRef.current).forEach((eventName) => {
         source.addEventListener(eventName, (e: MessageEvent) => {
           try {
-            handlersRef.current[eventName]?.(JSON.parse(e.data as string))
+            handlersRef.current[eventName]?.(JSON.parse(e.data))
           } catch {
-            // ignore malformed event data
+            // ignore malformed events
           }
         })
       })
     }
 
     connect()
+
     return () => sourceRef.current?.close()
   }, [])
 }
